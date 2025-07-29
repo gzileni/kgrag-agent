@@ -38,7 +38,10 @@ grag_ingestion = MemoryStoreRetriever(
 mcp = FastMCP("KGraph")
 
 
-@mcp.tool()
+@mcp.tool(
+    name="ingestion_document_tool",
+    description="Ingest a document into the KGraph system."
+)
 async def ingestion_document_tool(path_file: str):
     """
     Ingest a document into the KGraph system.
@@ -49,31 +52,37 @@ async def ingestion_document_tool(path_file: str):
         return f"Document {d} ingested successfully."
 
 
-@mcp.tool()
-async def arxiv_ingestion_tool(query: str):
+@mcp.tool(
+    name="arxiv_ingestion_tool",
+    description="Ingest a document from Arxiv based on a search query."
+)
+async def arxiv_ingestion_tool(txt: str):
     """
     Ingest a document from Arxiv based on a search query.
     Args:
         query (str): Search query for Arxiv.
     """
+    client = arxiv.Client()
     search = arxiv.Search(
-        query=query,
+        query=txt,
         max_results=1,
-        sort_by=arxiv.SortCriterion.Relevance
+        sort_by=arxiv.SortCriterion.SubmittedDate
     )
 
-    # Scarica il primo risultato
-    for result in search.results():
-        # Salva il PDF localmente
-        result.download_pdf(
-            dirpath=settings.PATH_DOWNLOAD,
-            filename=f"{result.entry_id}.pdf"
-        )
+    if len(search.id_list) == 0:
+        return "No results found."
 
-    async for d in grag_ingestion.process_documents(
-        path=settings.PATH_DOWNLOAD
-    ):
-        yield f"Arxiv document {d} ingested successfully."
+    for paper in client.results(search):
+        file_name = f"{paper.entry_id.split('/')[-1]}.pdf"
+        paper.download_pdf(
+            dirpath=settings.PATH_DOWNLOAD,
+            filename=file_name
+        )
+        paper = f"{settings.PATH_DOWNLOAD}/{file_name}"
+        async for d in grag_ingestion.process_documents(
+            path=paper
+        ):
+            return f"Arxiv document {d} ingested successfully."
 
 
 @mcp.prompt(title="Parser Text Prompt")
@@ -109,7 +118,7 @@ def agent_query_prompt(nodes_str: str, edges_str: str, user_query: str) -> str:
 
 def main():
     """Entry point for the direct execution server."""
-    mcp.run(transport="sse")
+    mcp.run(transport='sse')
 
 
 if __name__ == "__main__":
