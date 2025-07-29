@@ -13,6 +13,7 @@ from qdrant_client.models import PointStruct
 from .kgrag_ollama import ollama_pull
 from .kgrag_log import logger, get_metadata
 from .kgrag_components import GraphComponents
+from .kgrag_prompt import PARSER_PROMPT, AGENT_PROMPT
 
 TypeModel = Literal["openai", "ollama", "vllm"]
 
@@ -303,21 +304,7 @@ class MemoryStoreGraph(MemoryPersistence):
             prompt = ChatPromptTemplate.from_messages([
                 (
                     "system",
-                    """You are a precise graph relationship extractor.
-                    Extract all relationships from the text and format
-                    them as a JSON object with this exact structure:
-                    {
-                        "graph": [
-                            {
-                                "node": "Person/Entity",
-                                "target_node": "Related Entity",
-                                "relationship": "Type of Relationship"
-                            },
-                            ...more relationships...
-                        ]
-                    }
-                    Include ALL relationships mentioned in the text, including
-                    implicit ones. Be thorough and precise."""
+                    PARSER_PROMPT
                 ),
                 ("human", "{input_text}")
             ])
@@ -715,16 +702,10 @@ class MemoryStoreGraph(MemoryPersistence):
                     "system",
                     "Provide the answer for the following question:"
                 ),
-                ("human", (
-                    (
-                        "You are an intelligent assistant with access to the "
-                        "following knowledge graph:\n\n"
-                        "Nodes: \"{nodes_str}\"\n\n"
-                        "Edges: \"{edges_str}\"\n\n"
-                        "Using this graph, Answer the following question:\n\n"
-                        "User Query: \"{user_query}\""
-                    )
-                ))
+                (
+                    "human",
+                    AGENT_PROMPT
+                )
             ])
 
             chain = prompt | self.client_llm

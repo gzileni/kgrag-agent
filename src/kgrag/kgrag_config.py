@@ -129,6 +129,22 @@ def load_env_llm(model: str):
 ENV_FILE = load_env_file()
 
 
+def get_path_ingestion(collection_name: str) -> str:
+    """
+    Get the path for data ingestion.
+    Returns:
+        str: The path for data ingestion.
+    """
+    current_path = os.path.dirname(os.path.abspath(__file__))
+    p = os.path.join(current_path, "tmp")
+    if not os.path.exists(p):
+        os.makedirs(p)
+    p = os.path.join(p, collection_name)
+    if not os.path.exists(p):
+        os.makedirs(p)
+    return p
+
+
 # Parse list values from environment variables
 def parse_list_from_env(env_key, default=None):
     """Parse a comma-separated list from an environment variable."""
@@ -194,15 +210,9 @@ class Settings:
 
         self.COLLECTION_NAME = os.getenv('COLLECTION_NAME', 'kgrag_data')
 
-        app_root = os.path.dirname(os.path.abspath(__file__))
-        app_tmp = os.path.join(app_root, "tmp")
-        if not os.path.exists(app_tmp):
-            os.makedirs(app_tmp)
-        self.PATH_DOWNLOAD = os.path.join(
-            app_tmp, f"{self.COLLECTION_NAME}"
+        self.PATH_DOWNLOAD = get_path_ingestion(
+            f"{self.COLLECTION_NAME}"
         )
-        if not os.path.exists(self.PATH_DOWNLOAD):
-            os.makedirs(self.PATH_DOWNLOAD)
 
         self.LLM_MODEL_TYPE = os.getenv('LLM_MODEL_TYPE', 'openai')
         load_env_llm(self.LLM_MODEL_TYPE)
@@ -244,6 +254,8 @@ class Settings:
         logger.info(f"Redis DB: {self.REDIS_DB}")
 
         self.MAX_RECURSION_LIMIT = os.getenv("MAX_RECURSION_LIMIT", 25)
+        # LLM settings
+        self.LLM_URL = os.getenv("LLM_URL", None)
 
         # Apply environment-specific settings
         self.apply_environment_settings()

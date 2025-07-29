@@ -7,3 +7,4 @@ from .kgrag_components import single, GraphComponents
 from .kgrag_utils import print_progress_bar
 from .kgrag_config import settings
 from .kgrag_agent import agent_run
+from .kgrag_prompt import PARSER_PROMPT, AGENT_PROMPT

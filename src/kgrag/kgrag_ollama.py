@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from krag_agent.kgrag_log import get_logger
+from .kgrag_log import get_logger
 
 logger = get_logger(name="Ollama", loki_url=os.getenv("LOKI_URL"))
 
