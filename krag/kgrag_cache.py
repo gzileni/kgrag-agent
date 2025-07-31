@@ -3,7 +3,7 @@ import os
 from redis import Redis
 from datetime import datetime, timezone
 from typing import Any, List, Optional
-from .kgrag_log import get_logger
+from log import get_logger
 
 
 class MemoryRedisCacheRetriever:

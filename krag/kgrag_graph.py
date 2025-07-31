@@ -11,9 +11,9 @@ from neo4j_graphrag.retrievers import QdrantNeo4jRetriever
 from langchain_core.documents import Document
 from qdrant_client.models import PointStruct
 from .kgrag_ollama import ollama_pull
-from .kgrag_log import logger, get_metadata
+from log import logger, get_metadata
 from .kgrag_components import GraphComponents
-from .kgrag_prompt import PARSER_PROMPT, AGENT_PROMPT
+from .kgrag_prompt import AGENT_PROMPT
 
 TypeModel = Literal["openai", "ollama", "vllm"]
 
@@ -304,7 +304,19 @@ class MemoryStoreGraph(MemoryPersistence):
             prompt = ChatPromptTemplate.from_messages([
                 (
                     "system",
-                    PARSER_PROMPT
+                    """You are a precise graph relationship extractor.
+                    Extract all relationships from the text and format
+                    them as a JSON object with this exact structure:
+                    {{
+                        "graph": [
+                            {{"node": "Person/Entity",
+                            "target_node": "Related Entity",
+                            "relationship": "Type of Relationship"}},
+                            ...more relationships...
+                        ]
+                    }}
+                    Include ALL relationships mentioned in the text, including
+                    implicit ones. Be thorough and precise."""
                 ),
                 ("human", "{input_text}")
             ])
@@ -769,9 +781,9 @@ class MemoryStoreGraph(MemoryPersistence):
 
         index: int = 1
         for document in documents:
-            object_name = document.metadata.get("object_name", "Untitled")
-            msg = f"Ingesting document {index}/{len(documents)}: {object_name}"
-            logger.debug(f"{msg}: {object_name}",
+            title = document.metadata.get("title", "Untitled")
+            msg = f"Ingesting document {index}/{len(documents)}: {title}"
+            logger.debug(f"{msg}: {title}",
                          extra=get_metadata(thread_id=str(self.thread)))
             raw_data = document.page_content
             try:
@@ -789,7 +801,7 @@ class MemoryStoreGraph(MemoryPersistence):
                 continue
 
             index += 1
-            yield object_name
+            yield title
 
     async def _ingestion(self, raw_data, metadata: dict | None = None):
         """

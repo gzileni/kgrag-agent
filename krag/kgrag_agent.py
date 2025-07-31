@@ -7,8 +7,8 @@ from langchain_core.messages.utils import count_tokens_approximately
 from memory_agent import MemoryCheckpointer, MemoryPersistence
 from langmem import create_manage_memory_tool, create_search_memory_tool
 from langgraph.config import get_store
-from .kgrag_log import logger, get_metadata
-from .kgrag_config import settings
+from log import logger, get_metadata
+from config import settings
 from .kgrag_ingestion import grag_ingestion
 from .kgrag_tools import graph_rag_tool
 from .kgrag_state import State
@@ -150,7 +150,7 @@ def _get_memory():
     return host_persistence_config, memory_store
 
 
-async def agent_run(prompt: str, thread_id: str = str(uuid.uuid4())):
+async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
     """
     Asynchronously runs the agent with the given prompt.
 
@@ -256,7 +256,7 @@ async def agent_run(prompt: str, thread_id: str = str(uuid.uuid4())):
             yield event_response
 
 
-async def agent_stream(
+async def stream(
     prompt: str,
     thread_id: str = str(uuid.uuid4())
 ):

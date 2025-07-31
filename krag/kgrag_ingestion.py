@@ -1,5 +1,5 @@
 from .kgrag_retrievers import MemoryStoreRetriever
-from .kgrag_config import settings
+from config import settings
 
 grag_ingestion = MemoryStoreRetriever(
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,

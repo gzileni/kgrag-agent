@@ -1,10 +1,12 @@
-import arxiv
+import uuid
 from mcp.server.fastmcp import FastMCP
-from kgrag import (
-    settings,
+from arxiv_export_documents import export_papers
+from config import settings
+from krag import (
     MemoryStoreRetriever,
     PARSER_PROMPT,
-    AGENT_PROMPT
+    AGENT_PROMPT,
+    stream
 )
 
 model_embedding_url: str | None = None
@@ -24,6 +26,9 @@ grag_ingestion = MemoryStoreRetriever(
     model_embedding_type=settings.LLM_MODEL_TYPE,
     model_embedding_name=settings.MODEL_EMBEDDING,
     model_embedding_url=model_embedding_url,
+    model_embedding_vs_name=settings.VECTORDB_SENTENCE_MODEL,
+    model_embedding_vs_type=settings.VECTORDB_SENTENCE_TYPE,
+    model_embedding_vs_path=settings.VECTORDB_SENTENCE_PATH,
     neo4j_url=settings.NEO4J_URL,
     neo4j_username=settings.NEO4J_USERNAME,
     neo4j_password=settings.NEO4J_PASSWORD,
@@ -48,7 +53,7 @@ async def ingestion_document_tool(path_file: str):
     Args:
         path_file (str): Path to the document file to be ingested.
     """
-    async for d in grag_ingestion.process_document(path=path_file):
+    async for d in grag_ingestion.process_documents(path=path_file):
         return f"Document {d} ingested successfully."
 
 
@@ -56,33 +61,45 @@ async def ingestion_document_tool(path_file: str):
     name="arxiv_ingestion_tool",
     description="Ingest a document from Arxiv based on a search query."
 )
-async def arxiv_ingestion_tool(txt: str):
+async def arxiv_ingestion_tool(
+    search_query: str,
+    max_results: int = 5,
+    thread_id: str = str(uuid.uuid4())
+):
     """
     Ingest a document from Arxiv based on a search query.
     Args:
         query (str): Search query for Arxiv.
     """
-    client = arxiv.Client()
-    search = arxiv.Search(
-        query=txt,
-        max_results=1,
-        sort_by=arxiv.SortCriterion.SubmittedDate
-    )
-
-    if len(search.id_list) == 0:
-        return "No results found."
-
-    for paper in client.results(search):
-        file_name = f"{paper.entry_id.split('/')[-1]}.pdf"
-        paper.download_pdf(
-            dirpath=settings.PATH_DOWNLOAD,
-            filename=file_name
-        )
-        paper = f"{settings.PATH_DOWNLOAD}/{file_name}"
+    papers = []
+    async for paper in export_papers(
+        search=search_query,
+        path_download=settings.PATH_DOWNLOAD,
+        max_results=max_results
+    ):
         async for d in grag_ingestion.process_documents(
-            path=paper
+            documents=paper.documents,
         ):
-            return f"Arxiv document {d} ingested successfully."
+            if d == "ERROR":
+                return "Error ingesting document."
+            papers.append(d)
+            return f"Document {d} ingested successfully."
+
+    async for event_response in stream(
+        thread_id=thread_id,
+        prompt=search_query
+    ):
+        return event_response
+
+    if len(papers) > 0:
+        for paper in papers:
+            msg: str = (
+                f"Title: {paper.title},\n "
+                f"Authors: {', '.join(paper.authors)}\n"
+                f"Published: {paper.published},\n "
+                f"Link: {paper.link}\n"
+            )
+            return msg
 
 
 @mcp.prompt(title="Parser Text Prompt")

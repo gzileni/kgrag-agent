@@ -62,3 +62,7 @@ test.*
 merge.sh
 
 krag_agent/tmp/
+.env*
+merge.sh
+deploy.sh
+tmp/

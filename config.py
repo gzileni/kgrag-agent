@@ -10,7 +10,7 @@ import os
 from enum import Enum
 from dotenv import load_dotenv
 from typing import Literal
-from .kgrag_log import logger
+from log import logger
 
 TypeStorage = Literal["s3", "local"]
 
@@ -75,23 +75,12 @@ def get_environment() -> Environment:
             return Environment.DEVELOPMENT
 
 
-def get_path_env() -> str:
-    """
-    Get the path to the environment directory.
-
-    Returns:
-        str: The path to the environment directory.
-    """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_dir, "env")
-
-
 # Load appropriate .env file based on environment
 def load_env_file():
     """Load environment-specific .env file."""
     env = get_environment()
     print(f"Loading environment: {env}")
-    path_env = get_path_env()
+    path_env = os.path.dirname(os.path.abspath(__file__))
 
     # Define env files in priority order
     env_files = [
@@ -103,7 +92,7 @@ def load_env_file():
 
     # Load the first env file that exists
     for env_file in env_files:
-        if os.path.isfile(env_file):
+        if os.path.exists(env_file):
             load_dotenv(dotenv_path=env_file)
             print(f"Loaded environment from {env_file}")
             return env_file
@@ -119,9 +108,9 @@ def load_env_llm(model: str):
     print(f"Loading LLM environment: {env_file_llm}")
 
     # leggi la cartella corrente del file
-    path_env = get_path_env()
+    path_env = os.path.dirname(os.path.abspath(__file__))
     env_llm = os.path.join(path_env, env_file_llm)
-    if os.path.isfile(env_llm):
+    if os.path.exists(env_llm):
         load_dotenv(dotenv_path=env_llm)
         print(f"Loaded LLM environment from {env_llm}")
 
@@ -214,10 +203,6 @@ class Settings:
             f"{self.COLLECTION_NAME}"
         )
 
-        self.LLM_MODEL_TYPE = os.getenv('LLM_MODEL_TYPE', 'openai')
-        load_env_llm(self.LLM_MODEL_TYPE)
-        self.LLM_MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'gpt-4.1-mini')
-
         # Neo4j settings
         self.NEO4J_URL = os.getenv('NEO4J_URL', 'neo4j://localhost:47687')
         self.NEO4J_USERNAME = os.getenv('NEO4J_USERNAME', 'neo4j')
@@ -226,22 +211,6 @@ class Settings:
         logger.info(f"Neo4j URL: {self.NEO4J_URL}")
         logger.info(f"Neo4j Username: {self.NEO4J_USERNAME}")
         logger.info(f"Neo4j DB Name: {self.NEO4J_DB_NAME}")
-
-        self.QDRANT_URL = os.getenv('QDRANT_URL', 'http://localhost:6333')
-        logger.info(f"Qdrant URL: {self.QDRANT_URL}")
-
-        self.LOKI_URL = os.getenv(
-            'LOKI_URL',
-            'http://localhost:3100/loki/api/v1/push'
-        )
-
-        self.LLM_MODEL_TYPE = os.getenv("LLM_MODEL_TYPE", "openai")
-        self.MODEL_EMBEDDING = os.getenv("MODEL_EMBEDDING")
-        self.LLM_EMBEDDING_URL = os.getenv("LLM_EMBEDDING_URL")
-
-        self.VECTORDB_SENTENCE_MODEL = os.getenv("VECTORDB_SENTENCE_MODEL")
-        self.VECTORDB_SENTENCE_TYPE = os.getenv("VECTORDB_SENTENCE_TYPE", "hf")
-        self.VECTORDB_SENTENCE_PATH = os.getenv("VECTORDB_SENTENCE_PATH", None)
 
         # Redis settings
         self.REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -253,9 +222,38 @@ class Settings:
         logger.info(f"Redis Port: {self.REDIS_PORT}")
         logger.info(f"Redis DB: {self.REDIS_DB}")
 
+        self.QDRANT_URL = os.getenv('QDRANT_URL', 'http://localhost:6333')
+        logger.info(f"Qdrant URL: {self.QDRANT_URL}")
+
+        self.LOKI_URL = os.getenv(
+            'LOKI_URL',
+            'http://localhost:3100/loki/api/v1/push'
+        )
         self.MAX_RECURSION_LIMIT = os.getenv("MAX_RECURSION_LIMIT", 25)
+
+        self.LLM_MODEL_TYPE = os.getenv('LLM_MODEL_TYPE', 'openai')
+        load_env_llm(self.LLM_MODEL_TYPE)
+        self.LLM_MODEL_NAME = os.getenv('LLM_MODEL_NAME', 'gpt-4.1-mini')
+        self.LLM_EMBEDDING_URL = os.getenv(
+            "LLM_EMBEDDING_URL",
+            None
+        )
+        self.MODEL_EMBEDDING = os.getenv(
+            "MODEL_EMBEDDING",
+            "text-embedding-3-small"
+        )
         # LLM settings
         self.LLM_URL = os.getenv("LLM_URL", None)
+
+        self.VECTORDB_SENTENCE_MODEL = os.getenv(
+            "VECTORDB_SENTENCE_MODEL",
+            "BAAI/bge-small-en-v1.5"
+        )
+        self.VECTORDB_SENTENCE_TYPE = os.getenv(
+            "VECTORDB_SENTENCE_TYPE",
+            "hf"
+        )
+        self.VECTORDB_SENTENCE_PATH = os.getenv("VECTORDB_SENTENCE_PATH", None)
 
         # Apply environment-specific settings
         self.apply_environment_settings()

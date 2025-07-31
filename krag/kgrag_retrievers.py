@@ -9,8 +9,8 @@ from langchain_core.documents import Document
 from .kgrag_graph import MemoryStoreGraph
 from .kgrag_cache import MemoryRedisCacheRetriever
 from .kgrag_utils import print_progress_bar
-from .kgrag_log import get_logger, get_metadata
-from .kgrag_config import settings
+from log import get_logger, get_metadata
+from config import settings
 
 PathType = Literal["fs", "s3"]
 FormatFile = Literal["pdf", "csv", "json"]
@@ -103,7 +103,10 @@ class MemoryStoreRetriever(MemoryStoreGraph):
                 )
                 self.logger.error(
                     msg,
-                    extra=get_metadata(thread_id=str(self.thread)))
+                    extra=get_metadata(
+                        thread_id=str(self.thread)
+                    )
+                )
                 raise ValueError(msg)
 
             self._create_download_dir(self.path_download, delete=True)
@@ -198,7 +201,9 @@ class MemoryStoreRetriever(MemoryStoreGraph):
         # create the directory if it doesn't exist
         if not os.path.exists(path):
             self.logger.info(f"Creating directory: {path}",
-                             extra=get_metadata(thread_id=str(self.thread)))
+                             extra=get_metadata(
+                                thread_id=str(self.thread)
+                             ))
             os.makedirs(path, exist_ok=True)
 
         # Se esistono file nella cartella local_dir, cancellali tutti
@@ -245,7 +250,9 @@ class MemoryStoreRetriever(MemoryStoreGraph):
                 "Path is not set. Please provide a valid path."
             )
             self.logger.error(msg,
-                              extra=get_metadata(thread_id=str(self.thread)))
+                              extra=get_metadata(
+                                  thread_id=str(self.thread)
+                              ))
             raise ValueError(msg)
 
         if format_file == "pdf":
@@ -296,6 +303,7 @@ class MemoryStoreRetriever(MemoryStoreGraph):
         # Check if files already exist in the cache
         # Only keep files that are in the cache and have ingested == False
         files_to_process = []
+        extra = get_metadata(thread_id=str(self.thread))
 
         if not refresh:
             index = 1
@@ -319,92 +327,99 @@ class MemoryStoreRetriever(MemoryStoreGraph):
                 index += 1
         else:
             self.logger.info("Refreshing cache. All files will be processed.",
-                             extra=get_metadata(thread_id=str(self.thread)))
+                             extra=extra
+                             )
             files_to_process = files
 
         self.logger.info(
             f"Filtered files: {len(files_to_process)} files to process.",
-            extra=get_metadata(thread_id=str(self.thread))
+            extra=extra
         )
         return files_to_process
 
-    async def process_document(self, **kwargs: Any):
+    async def process_documents(self, **kwargs: Any):
         """
         Processes documents based on the specified path type and format.
         Args:
+        - documents (list[Document]): List of Document objects to process.
         - path (str): The local path where files are located.
-        - bucket_name (str): The name of the S3 bucket
+            If documents are provided, this is ignored.
+        - bucket_name (str): The name of the S3 bucket.
+            If documents are provided, this is ignored.
         - aws_region (str): The AWS region
+            If documents are provided, this is ignored.
         """
-        path = kwargs.get("path", None)
-        if path is None:
-            msg: str = (
-                "Path is not set. "
-                "Please provide a valid path."
+
+        documents: list[Document] = kwargs.get("documents", [])
+        extra = get_metadata(thread_id=str(self.thread))
+
+        if len(documents) == 0:
+            path = kwargs.get("path", None)
+            if path is None:
+                msg: str = (
+                    "Path is not set. "
+                    "Please provide a valid path."
+                )
+                self.logger.error(msg,
+                                  extra=extra)
+                raise ValueError(msg)
+
+            if os.path.exists(path):
+                msg: str = (
+                    f"Path '{path}' exist. "
+                    "Ingestion not required."
+                )
+                self.logger.warning(
+                    msg,
+                    extra=extra
+                )
+                return
+
+            file = os.path.basename(path)
+            metadata = {
+                "object_name": file,
+                "local_path": path
+            }
+
+            bucket_name = kwargs.get("bucket_name", None)
+            if bucket_name is not None:
+                metadata["bucket_name"] = bucket_name
+
+            aws_region = kwargs.get("aws_region", None)
+            if aws_region is not None:
+                metadata["aws_region"] = aws_region
+
+            ext = os.path.splitext(path)[1].lower()
+            if ext == ".pdf":
+                self.format_file = "pdf"
+            elif ext == ".csv":
+                self.format_file = "csv"
+            elif ext == ".json":
+                self.format_file = "json"
+            else:
+                msg = f"Unsupported file extension: {ext}"
+                self.logger.error(
+                    msg,
+                    extra=extra
+                )
+                raise ValueError(msg)
+
+            docs = self._get_documents_from_path(
+                path,
+                headers=metadata,
+                format_file=ext
             )
-            self.logger.error(msg,
-                              extra=get_metadata(thread_id=str(self.thread)))
-            raise ValueError(msg)
+            if not docs:
+                self.logger.warning(
+                    f"No documents found in {path}. Skipping.",
+                    extra=extra
+                )
+                return
 
-        if os.path.exists(path):
-            msg: str = (
-                f"Path '{path}' exist. "
-                "Ingestion not required."
-            )
-            self.logger.warning(
-                msg,
-                extra=get_metadata(thread_id=str(self.thread))
-            )
-            return
-
-        file = os.path.basename(path)
-        metadata = {
-            "object_name": file,
-            "local_path": path
-        }
-
-        bucket_name = kwargs.get("bucket_name", None)
-        if bucket_name is not None:
-            metadata["bucket_name"] = bucket_name
-
-        aws_region = kwargs.get("aws_region", None)
-        if aws_region is not None:
-            metadata["aws_region"] = aws_region
-
-        ext = os.path.splitext(path)[1].lower()
-        if ext == ".pdf":
-            self.format_file = "pdf"
-        elif ext == ".csv":
-            self.format_file = "csv"
-        elif ext == ".json":
-            self.format_file = "json"
+            for doc in docs:
+                doc.metadata.update(metadata)
         else:
-            msg = f"Unsupported file extension: {ext}"
-            self.logger.error(
-                msg,
-                extra=get_metadata(thread_id=str(self.thread))
-            )
-            raise ValueError(msg)
-
-        docs = self._get_documents_from_path(
-            path,
-            headers=metadata,
-            format_file=ext
-        )
-        if not docs:
-            self.logger.warning(
-                f"No documents found in {path}. Skipping.",
-                extra=get_metadata(thread_id=str(self.thread))
-            )
-            return
-
-        for doc in docs:
-            doc.metadata.update(metadata)
-
-        self.logger.info(
-            f"Ingesting {len(docs)} documents into the memory store.",
-            extra=get_metadata(thread_id=str(self.thread))
-        )
+            docs = documents
 
         # Call the ingestion method from the parent class
         async for d in self._ingestion_batch(
@@ -536,7 +551,7 @@ class MemoryStoreRetriever(MemoryStoreGraph):
                     extra=get_metadata(thread_id=str(self.thread))
                 )
 
-            async for d in self.process_document(
+            async for d in self.process_documents(
                 path=local_file,
                 bucket_name=self.s3_bucket,
                 aws_region=self.aws_region
@@ -691,7 +706,7 @@ class MemoryStoreRetriever(MemoryStoreGraph):
             for pdf_file in pdf_files:
                 file_path = os.path.join(path, pdf_file)
                 # Call the ingestion method from the parent class
-                async for d in self.process_document(
+                async for d in self.process_documents(
                     path=file_path,
                 ):
                     if d == "ERROR":
@@ -722,7 +737,7 @@ class MemoryStoreRetriever(MemoryStoreGraph):
             )
             raise e
 
-    async def process_documents(self, **kwargs: Any):
+    async def process_path(self, **kwargs: Any):
         """
         Processes a PDF document by loading it, splitting it into chunks,
         embedding them, and building a knowledge graph.
