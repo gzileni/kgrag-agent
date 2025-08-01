@@ -109,7 +109,7 @@ class MemoryStoreRetriever(MemoryStoreGraph):
                 )
                 raise ValueError(msg)
 
-            self._create_download_dir(self.path_download, delete=True)
+            self._create_download_dir(self.path_download)
 
             if not all([self.aws_access_key_id, self.aws_secret_access_key,
                         self.s3_bucket, self.aws_region]):

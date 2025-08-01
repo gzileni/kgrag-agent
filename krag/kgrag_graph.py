@@ -787,10 +787,11 @@ class MemoryStoreGraph(MemoryPersistence):
                          extra=get_metadata(thread_id=str(self.thread)))
             raw_data = document.page_content
             try:
-                await self._ingestion(
+                async for step in self._ingestion(
                     raw_data=raw_data,
                     metadata=document.metadata
-                )
+                ):
+                    yield f"{step} ({index}/{len(documents)} - {title})"
             except Exception as e:
                 logger.error(
                     f"Error during ingestion of document {index}: {str(e)}",
@@ -801,7 +802,6 @@ class MemoryStoreGraph(MemoryPersistence):
                 continue
 
             index += 1
-            yield title
 
     async def _ingestion(self, raw_data, metadata: dict | None = None):
         """
@@ -816,24 +816,27 @@ class MemoryStoreGraph(MemoryPersistence):
             NotImplementedError: If the method is not implemented.
         """
         try:
+            yield "Analyzing raw data for graph components."
             nodes, relationships = await self._extract_graph_components(
                 raw_data
             )
+            yield "Extracted graph components from raw data."
             logger.debug(
                 f"Extracted {len(nodes)} nodes and "
                 f"{len(relationships)} relationships from the raw data."
             )
-
+            yield "Saving nodes and relationships"
             node_id_mapping = self._ingest_to_neo4j(nodes, relationships)
             logger.debug(
                 f"Ingested {len(node_id_mapping)} nodes into Neo4j."
             )
-
+            yield "Vectorizing raw data and ingesting data"
             await self._ingest_to_qdrant(
                 raw_data=raw_data,
                 node_id_mapping=node_id_mapping,
                 metadata=metadata
             )
+            yield "Vectorized raw data and ingested data"
             logger.debug(
                 f"Ingested data into Qdrant collection "
                 f"'{self.collection_name}'."

@@ -63,7 +63,7 @@ async def ingestion_document_tool(path_file: str):
 )
 async def arxiv_ingestion_tool(
     search_query: str,
-    max_results: int = 5,
+    max_results: int = 1,
     thread_id: str = str(uuid.uuid4())
 ):
     """
@@ -77,29 +77,37 @@ async def arxiv_ingestion_tool(
         path_download=settings.PATH_DOWNLOAD,
         max_results=max_results
     ):
-        async for d in grag_ingestion.process_documents(
-            documents=paper.documents,
-        ):
-            if d == "ERROR":
-                return "Error ingesting document."
-            papers.append(d)
-            return f"Document {d} ingested successfully."
+        if not paper.is_exist:
+            async for d in grag_ingestion.process_documents(
+                documents=paper.documents,
+            ):
+                if d == "ERROR":
+                    return "Error ingesting document."
+                print(d)
+        papers.append(paper)
 
-    async for event_response in stream(
-        thread_id=thread_id,
-        prompt=search_query
-    ):
-        return event_response
-
+    papers_list: list[str] = []
     if len(papers) > 0:
         for paper in papers:
             msg: str = (
                 f"Title: {paper.title},\n "
                 f"Authors: {', '.join(paper.authors)}\n"
-                f"Published: {paper.published},\n "
                 f"Link: {paper.link}\n"
             )
-            return msg
+            papers_list.append(msg)
+
+    async for event_response in stream(
+        thread_id=thread_id,
+        prompt=search_query
+    ):
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "message": str(event_response),
+                "papers": papers_list if papers_list else ["No papers found."]
+            },
+            "id": thread_id
+        }
 
 
 @mcp.prompt(title="Parser Text Prompt")
