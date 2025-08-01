@@ -73,12 +73,11 @@ async def query(
 
 
 @mcp.tool(
-    name="ingestion_documents",
-    description="Ingest a document into the KGraph system."
+    name="ingestion_document",
+    description="Ingest a path of file into the KGraph system."
 )
-async def ingestion_documents(
-    path_file: str,
-    thread_id: str = str(uuid.uuid4())
+async def ingestion_document(
+    path_file: str
 ):
     """
     Ingest a document into the KGraph system.
