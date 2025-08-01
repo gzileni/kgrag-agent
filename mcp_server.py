@@ -8,6 +8,8 @@ from krag import (
     AGENT_PROMPT,
     stream
 )
+from starlette.applications import Starlette
+from starlette.routing import Mount, Host
 
 model_embedding_url: str | None = None
 llm_model_url: str | None = None
@@ -82,8 +84,9 @@ async def arxiv_ingestion_tool(
                 documents=paper.documents,
             ):
                 if d == "ERROR":
-                    return "Error ingesting document."
-                print(d)
+                    print("Error ingesting document.")
+                else:
+                    print(d)
         papers.append(paper)
 
     papers_list: list[str] = []
@@ -141,10 +144,17 @@ def agent_query_prompt(nodes_str: str, edges_str: str, user_query: str) -> str:
     )
 
 
-def main():
+# def main():
     """Entry point for the direct execution server."""
-    mcp.run(transport='sse')
+#    mcp.run(transport='sse')
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#    main()
+
+# Mount the SSE server to the existing ASGI server
+app = Starlette(
+    routes=[
+        Mount('/', app=mcp.sse_app()),
+    ]
+)
