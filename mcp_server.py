@@ -9,7 +9,8 @@ from krag import (
     stream
 )
 from starlette.applications import Starlette
-from starlette.routing import Mount, Host
+from starlette.routing import Mount
+from typing import Any
 
 model_embedding_url: str | None = None
 llm_model_url: str | None = None
@@ -46,10 +47,39 @@ mcp = FastMCP("KGraph")
 
 
 @mcp.tool(
-    name="ingestion_document_tool",
+    name="query",
     description="Ingest a document into the KGraph system."
 )
-async def ingestion_document_tool(path_file: str):
+async def query(
+    query: str = "",
+    thread_id: str = str(uuid.uuid4())
+):
+    """
+    Ingest a document into the KGraph system.
+    Args:
+        query (str): Query for the document to be ingested.
+    """
+    async for event_response in stream(
+        thread_id=thread_id,
+        prompt=query
+    ):
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "message": str(event_response)
+            },
+            "id": thread_id
+        }
+
+
+@mcp.tool(
+    name="ingestion_documents",
+    description="Ingest a document into the KGraph system."
+)
+async def ingestion_documents(
+    path_file: str,
+    thread_id: str = str(uuid.uuid4())
+):
     """
     Ingest a document into the KGraph system.
     Args:
@@ -60,10 +90,35 @@ async def ingestion_document_tool(path_file: str):
 
 
 @mcp.tool(
-    name="arxiv_ingestion_tool",
+    name="arxiv_query_stream",
+    description="Query Arxiv for papers based on a search query."
+)
+async def arxiv_query_stream(
+    search_query: str,
+    max_results: int = 1,
+    thread_id: str = str(uuid.uuid4())
+):
+    """
+    Query Arxiv for papers based on a search query.
+    Args:
+        search_query (str): Search query for Arxiv.
+        max_results (int): Maximum number of results to return.
+    """
+    async for paper in _export_arxiv_papers(search_query, max_results):
+        yield paper
+
+    async for event_response in stream(
+        thread_id=thread_id,
+        prompt=search_query
+    ):
+        yield event_response
+
+
+@mcp.tool(
+    name="arxiv_query",
     description="Ingest a document from Arxiv based on a search query."
 )
-async def arxiv_ingestion_tool(
+async def arxiv_query(
     search_query: str,
     max_results: int = 1,
     thread_id: str = str(uuid.uuid4())
@@ -72,6 +127,35 @@ async def arxiv_ingestion_tool(
     Ingest a document from Arxiv based on a search query.
     Args:
         query (str): Search query for Arxiv.
+    """
+    papers: list[Any] = []
+    async for paper in _export_arxiv_papers(search_query, max_results):
+        papers.append(paper)
+
+    async for event_response in stream(
+        thread_id=thread_id,
+        prompt=search_query
+    ):
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "message": str(event_response),
+                "papers": (
+                    papers[-1] if len(papers) > 0 else ["No papers found."]
+                )
+            },
+            "id": thread_id
+        }
+
+
+async def _export_arxiv_papers(search_query, max_results):
+    """
+    Export documents from Arxiv based on a search query.
+    Args:
+        search_query (str): Search query for Arxiv.
+        max_results (int): Maximum number of results to return.
+    Returns:
+        list: List of ArxivPaper objects.
     """
     papers = []
     async for paper in export_papers(
@@ -84,9 +168,9 @@ async def arxiv_ingestion_tool(
                 documents=paper.documents,
             ):
                 if d == "ERROR":
-                    print("Error ingesting document.")
+                    yield "Error ingesting document."
                 else:
-                    print(d)
+                    yield d
         papers.append(paper)
 
     papers_list: list[str] = []
@@ -99,18 +183,7 @@ async def arxiv_ingestion_tool(
             )
             papers_list.append(msg)
 
-    async for event_response in stream(
-        thread_id=thread_id,
-        prompt=search_query
-    ):
-        return {
-            "jsonrpc": "2.0",
-            "result": {
-                "message": str(event_response),
-                "papers": papers_list if papers_list else ["No papers found."]
-            },
-            "id": thread_id
-        }
+    yield papers_list
 
 
 @mcp.prompt(title="Parser Text Prompt")
@@ -143,14 +216,6 @@ def agent_query_prompt(nodes_str: str, edges_str: str, user_query: str) -> str:
         user_query=user_query
     )
 
-
-# def main():
-    """Entry point for the direct execution server."""
-#    mcp.run(transport='sse')
-
-
-# if __name__ == "__main__":
-#    main()
 
 # Mount the SSE server to the existing ASGI server
 app = Starlette(
