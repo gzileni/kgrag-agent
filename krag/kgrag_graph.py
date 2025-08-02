@@ -687,6 +687,51 @@ class MemoryStoreGraph(MemoryPersistence):
 
         return {"nodes": list(nodes), "edges": edges}
 
+    async def _stream(self, graph_context, user_query):
+        """
+        Run the GraphRAG process using the provided
+            graph context and user query.
+        Args:
+            graph_context (dict): A dictionary containing the graph
+                context with nodes and edges.
+            user_query (str): The user's query to be answered
+                using the graph context.
+            **kwargs: Additional keyword arguments for LLM configuration.
+        Returns:
+            str: The response from the LLM based on the graph
+                context and user query.
+        Raises:
+            ValueError: If the graph context is not provided or
+                if the user query is empty.
+            Exception: If there is an error querying the LLM.
+        """
+        try:
+            input, chain = self._get_chain_graph(user_query, graph_context)
+
+            async for response in chain.astream(input):
+                if response is None:
+                    logger.error(
+                        "OpenAI response content is None",
+                        extra=get_metadata(thread_id=str(self.thread))
+                    )
+                    raise ValueError("OpenAI response content is None")
+
+                if isinstance(response.content, list):
+                    answer_text = "\n".join(
+                        str(item) for item in response.content
+                    )
+                else:
+                    answer_text = str(response.content)
+
+                yield answer_text.strip()
+
+        except Exception as e:
+            logger.error(
+                f"Error during LLM processing: {str(e)}",
+                extra=get_metadata(thread_id=str(self.thread))
+            )
+            raise e
+
     async def _run(self, graph_context, user_query):
         """
         Run the GraphRAG process using the provided
@@ -706,25 +751,9 @@ class MemoryStoreGraph(MemoryPersistence):
             Exception: If there is an error querying the LLM.
         """
         try:
-            nodes_str = ", ".join(graph_context["nodes"])
-            edges_str = "; ".join(graph_context["edges"])
+            input, chain = self._get_chain_graph(user_query, graph_context)
 
-            prompt = ChatPromptTemplate.from_messages([
-                (
-                    "system",
-                    "Provide the answer for the following question:"
-                ),
-                (
-                    "human",
-                    AGENT_PROMPT
-                )
-            ])
-
-            chain = prompt | self.client_llm
-
-            response = await chain.ainvoke({"nodes_str": nodes_str,
-                                            "edges_str": edges_str,
-                                            "user_query": user_query})
+            response = await chain.ainvoke(input)
 
             if response is None:
                 logger.error(
@@ -744,6 +773,46 @@ class MemoryStoreGraph(MemoryPersistence):
                 extra=get_metadata(thread_id=str(self.thread))
             )
             raise e
+
+    def _get_chain_graph(self, user_query, graph_context):
+        """
+        Get the chain for processing the graph context and user query.
+        Args:
+            user_query (str): The user's query to be answered
+                using the graph context.
+            graph_context (dict): A dictionary containing the graph
+                context with nodes and edges.
+        Returns:
+            tuple: A tuple containing:
+                - nodes_str (str): A string representation of the nodes.
+                - edges_str (str): A string representation of the edges.
+                - chain (ChatPromptTemplate): The chain for processing
+                    the graph context and user query.
+        Raises:
+            ValueError: If the graph context is not provided or
+                if the user query is empty.
+        """
+
+        nodes_str: str = ", ".join(graph_context["nodes"])
+        edges_str: str = "; ".join(graph_context["edges"])
+
+        prompt = ChatPromptTemplate.from_messages([
+                (
+                    "system",
+                    "Provide the answer for the following question:"
+                ),
+                (
+                    "human",
+                    AGENT_PROMPT
+                )
+            ])
+
+        chain = prompt | self.client_llm
+        return {
+            "nodes_str": nodes_str,
+            "edges_str": edges_str,
+            "user_query": user_query
+        }, chain
 
     async def _ingestion_batch(
         self,
@@ -848,6 +917,35 @@ class MemoryStoreGraph(MemoryPersistence):
             )
             raise e
 
+    async def query_stream(self, query: str):
+        """
+        Query the memory graph using the provided query.
+        Args:
+            query (str): The query to be executed on the memory graph.
+            collection_name (str, optional): The name of the Qdrant
+                collection to use for the query.
+        Returns:
+            list: A list of search results from the memory graph.
+        Raises:
+            ValueError: If the collection name is not provided
+                or if the query is empty.
+        """
+        try:
+            if not query:
+                raise ValueError("Query must not be empty")
+
+            graph_context = self._get_graph_context(query)
+            async for s in self._stream(
+                graph_context=graph_context,
+                user_query=query
+            ):
+                logger.debug(f"Generated answer from LLM: {s}")
+                yield s
+        except Exception as e:
+            logger.error(f"Error during query process: {str(e)}",
+                         extra=get_metadata(thread_id=str(self.thread)))
+            raise e
+
     async def query(self, query: str):
         """
         Query the memory graph using the provided query.
@@ -865,50 +963,7 @@ class MemoryStoreGraph(MemoryPersistence):
             if not query:
                 raise ValueError("Query must not be empty")
 
-            logger.debug(
-                f"Starting query process for the query: '{query}'"
-            )
-            retriever_result = self._retriever_search(query=query)
-            logger.debug(
-                f"Retrieved {len(retriever_result.items)} results"
-                f" for the query '{query}' from the memory graph."
-            )
-
-            logger.debug(
-                "Extracting entity IDs from the retriever results."
-            )
-            entity_ids = [
-                item.content.split("'id': '")[1].split("'")[0]
-                for item in retriever_result.items
-            ]
-            logger.debug(
-                f"Extracted {len(entity_ids)} entity IDs from the "
-                "retriever results."
-            )
-
-            logger.debug(
-                "Fetching related subgraph from Neo4j based on the "
-                "entity IDs."
-            )
-            subgraph = self._fetch_related_graph(entity_ids=entity_ids)
-            logger.debug(
-                f"Fetched subgraph with {len(subgraph)} related nodes "
-                "and relationships from Neo4j."
-            )
-
-            logger.debug(
-                "Formatting graph context for LLM processing."
-            )
-            graph_context = self._format_graph_context(subgraph)
-            logger.debug(
-                f"Formatted graph context with {len(graph_context['nodes'])} "
-                f"nodes and {len(graph_context['edges'])} edges."
-            )
-
-            logger.debug(
-                "Running LLM to generate answer based on the graph "
-                "context and user query."
-            )
+            graph_context = self._get_graph_context(query)
             answer = await self._run(
                 graph_context=graph_context,
                 user_query=query
@@ -919,3 +974,57 @@ class MemoryStoreGraph(MemoryPersistence):
             logger.error(f"Error during query process: {str(e)}",
                          extra=get_metadata(thread_id=str(self.thread)))
             raise e
+
+    def _get_graph_context(self, query):
+        """
+        Get the graph context for the provided query.
+        Args:
+            query (str): The query to be executed on the memory graph.
+        Returns:
+            dict: A dictionary containing the graph context with
+            nodes and edges.
+        Raises:
+            ValueError: If the Neo4j driver is not initialized
+                or if the query is empty.
+        """
+        logger.debug(
+                f"Starting query process for the query: '{query}'"
+            )
+        retriever_result = self._retriever_search(query=query)
+        logger.debug(
+                f"Retrieved {len(retriever_result.items)} results"
+                f" for the query '{query}' from the memory graph."
+            )
+
+        logger.debug(
+                "Extracting entity IDs from the retriever results."
+            )
+        entity_ids = [
+                item.content.split("'id': '")[1].split("'")[0]
+                for item in retriever_result.items
+            ]
+        logger.debug(
+                f"Extracted {len(entity_ids)} entity IDs from the "
+                "retriever results."
+            )
+
+        logger.debug(
+                "Fetching related subgraph from Neo4j based on the "
+                "entity IDs."
+            )
+        subgraph = self._fetch_related_graph(entity_ids=entity_ids)
+        logger.debug(
+                f"Fetched subgraph with {len(subgraph)} related nodes "
+                "and relationships from Neo4j."
+            )
+
+        logger.debug(
+                "Formatting graph context for LLM processing."
+            )
+        graph_context = self._format_graph_context(subgraph)
+        logger.debug(
+                f"Formatted graph context with {len(graph_context['nodes'])} "
+                f"nodes and {len(graph_context['edges'])} edges."
+            )
+
+        return graph_context

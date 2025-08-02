@@ -10,7 +10,7 @@ from .kgrag_graph import MemoryStoreGraph
 from .kgrag_cache import MemoryRedisCacheRetriever
 from .kgrag_utils import print_progress_bar
 from log import get_logger, get_metadata
-from config import settings
+from krag.kgrag_config import settings
 
 PathType = Literal["fs", "s3"]
 FormatFile = Literal["pdf", "csv", "json"]

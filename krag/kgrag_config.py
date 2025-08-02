@@ -81,13 +81,14 @@ def load_env_file():
     env = get_environment()
     print(f"Loading environment: {env}")
     path_env = os.path.dirname(os.path.abspath(__file__))
+    p_env: str = os.path.join(path_env, "..")
 
     # Define env files in priority order
     env_files = [
-        os.path.join(path_env, f".env.{env.value}.local"),
-        os.path.join(path_env, f".env.{env.value}"),
-        os.path.join(path_env, ".env.local"),
-        os.path.join(path_env, ".env"),
+        os.path.join(p_env, f".env.{env.value}.local"),
+        os.path.join(p_env, f".env.{env.value}"),
+        os.path.join(p_env, ".env.local"),
+        os.path.join(p_env, ".env"),
     ]
 
     # Load the first env file that exists
@@ -109,7 +110,8 @@ def load_env_llm(model: str):
 
     # leggi la cartella corrente del file
     path_env = os.path.dirname(os.path.abspath(__file__))
-    env_llm = os.path.join(path_env, env_file_llm)
+    p_env: str = os.path.join(path_env, "..")
+    env_llm = os.path.join(p_env, env_file_llm)
     if os.path.exists(env_llm):
         load_dotenv(dotenv_path=env_llm)
         print(f"Loaded LLM environment from {env_llm}")

@@ -8,15 +8,11 @@ from memory_agent import MemoryCheckpointer, MemoryPersistence
 from langmem import create_manage_memory_tool, create_search_memory_tool
 from langgraph.config import get_store
 from log import logger, get_metadata
-from config import settings
-from .kgrag_ingestion import grag_ingestion
-from .kgrag_tools import graph_rag_tool
-from .kgrag_state import State
-
+from krag import settings, kgrag, State, kgrag_mcp_client
 
 summarize_node = SummarizationNode(
     token_counter=count_tokens_approximately,
-    model=grag_ingestion._get_model(),
+    model=kgrag._get_model(),
     max_tokens=384,
     max_summary_tokens=128,
     output_messages_key="llm_input_messages",
@@ -150,6 +146,20 @@ def _get_memory():
     return host_persistence_config, memory_store
 
 
+async def _get_tools():
+    """
+    Retrieves the tools available for the agent.
+    Returns:
+        list: A list of tools available for the agent.
+    """
+    tools = await kgrag_mcp_client.get_tools()
+    tools.extend([
+        create_manage_memory_tool(namespace=("memories",)),
+        create_search_memory_tool(namespace=("memories",))
+    ])
+    return tools
+
+
 async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
     """
     Asynchronously runs the agent with the given prompt.
@@ -225,12 +235,9 @@ async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
         await checkpointer.adelete_by_thread_id(thread_id)
 
         agent = create_react_agent(
-            grag_ingestion._get_model(),
+            kgrag._get_model(),
             prompt=prompt,
-            tools=[graph_rag_tool,
-                   create_manage_memory_tool(namespace=("memories",)),
-                   create_search_memory_tool(namespace=("memories",))
-                   ],
+            tools=await _get_tools(),
             store=memory_store.get_in_memory_store(),
             state_schema=State,
             pre_model_hook=summarize_node,
@@ -337,12 +344,8 @@ async def stream(
             )
 
             agent = create_react_agent(
-                grag_ingestion._get_model(),
-                tools=[
-                    graph_rag_tool,
-                    create_manage_memory_tool(namespace=("memories",)),
-                    create_search_memory_tool(namespace=("memories",))
-                ],
+                kgrag._get_model(),
+                tools=await _get_tools(),
                 store=memory_store.get_in_memory_store(),
                 checkpointer=checkpointer,
                 state_schema=State,

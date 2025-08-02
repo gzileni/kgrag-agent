@@ -2,7 +2,7 @@
 
 run:
 	echo "Running stack agent ..."
-	docker-compose -p memory up -d
+	docker-compose -p kgrag-agent up -d
 
 stop:
 	echo "Stopping qdrant ..."
