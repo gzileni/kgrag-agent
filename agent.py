@@ -5,10 +5,9 @@ from langchain_core.runnables import RunnableConfig
 from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from memory_agent import MemoryCheckpointer, MemoryPersistence
-from langmem import create_manage_memory_tool, create_search_memory_tool
 from langgraph.config import get_store
 from log import logger, get_metadata
-from krag import settings, kgrag, State, kgrag_mcp_client
+from krag import settings, kgrag, State
 
 summarize_node = SummarizationNode(
     token_counter=count_tokens_approximately,
@@ -146,80 +145,19 @@ def _get_memory():
     return host_persistence_config, memory_store
 
 
-async def _get_tools():
-    """
-    Retrieves the tools available for the agent.
-    Returns:
-        list: A list of tools available for the agent.
-    """
-    tools = await kgrag_mcp_client.get_tools()
-    tools.extend([
-        create_manage_memory_tool(namespace=("memories",)),
-        create_search_memory_tool(namespace=("memories",))
-    ])
-    return tools
-
-
-async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
+async def invoke(
+    prompt: str,
+    tools: list,
+    thread_id: str = str(uuid.uuid4())
+):
     """
     Asynchronously runs the agent with the given prompt.
 
     Args:
-        kwargs (dict): A dictionary containing optional parameters
-        for memory persistence configuration.
-        The expected structure for `memory_persistence_config` is:
-            {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0
-            }
-    If `memory_persistence_config` is not provided, it defaults
-    to the Redis settings from the environment.
-    If `model_embedding_type` is "vllm", it requires
-        `model_embedding_url` to be provided.
-    If `model_embedding` and `model_embedding_url` are not provided,
-    it raises a ValueError.
-    If `qdrant_url` is not provided, it raises a ValueError.
-    If `model_embedding_vs_name` and `model_embedding_vs_type`
-        are not provided, it raises a ValueError.
-    If `model_embedding_vs_type` is "local", it requires
-        `model_embedding_vs_path` to be provided.
-    Args:
-        kwargs (dict): A dictionary containing optional parameters
-            for memory persistence configuration.
-        The expected structure for `memory_persistence_config` is:
-            {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0
-            }
-        - `model_embedding_type`: The type of model embedding
-            to use (default is settings.LLM_MODEL_TYPE).
-        - `model_embedding`: The name of the model embedding
-            to use (default is settings.MODEL_EMBEDDING).
-        - `model_embedding_url`: The URL of the model embedding
-            (default is settings.LLM_EMBEDDING_URL).
-        - `qdrant_url`: The URL of the Qdrant instance
-            (default is the environment variable QDRANT_URL).
-        - `model_embedding_vs_name`: The name of the vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_MODEL).
-        - `model_embedding_vs_type`: The type of vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_TYPE).
-        - `model_embedding_vs_path`: The path to the vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_PATH).
-
-    Returns:
-        Any: The response from the agent after processing the prompt.
-
-    Raises:
-        Exception: Propagates any exceptions raised during agent invocation.
-
-    Note:
-        This function sends the prompt as a user message and awaits
-            the agent's response in streaming mode ("updates").
+        prompt (str): The user input prompt to be processed by the agent.
+        tools (list): A list of tools available for the agent to use.
+        thread_id (str): A unique identifier for the thread,
+            used for tracking and logging.
     """
 
     host_persistence_config, memory_store = _get_memory()
@@ -237,7 +175,7 @@ async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
         agent = create_react_agent(
             kgrag._get_model(),
             prompt=prompt,
-            tools=await _get_tools(),
+            tools=tools,
             store=memory_store.get_in_memory_store(),
             state_schema=State,
             pre_model_hook=summarize_node,
@@ -260,11 +198,12 @@ async def invoke(prompt: str, thread_id: str = str(uuid.uuid4())):
                 f">>> Response event from agent: {event_response}",
                 extra=get_metadata(thread_id=thread_id)
             )
-            yield event_response
+            return event_response
 
 
 async def stream(
     prompt: str,
+    tools: list,
     thread_id: str = str(uuid.uuid4())
 ):
     """
@@ -272,58 +211,10 @@ async def stream(
     on the provided prompt.
 
     Args:
-        kwargs (dict): A dictionary containing optional parameters
-        for memory persistence configuration.
-        The expected structure for `memory_persistence_config` is:
-            {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0
-            }
-    If `memory_persistence_config` is not provided, it defaults
-        to the Redis settings from the environment.
-    If `model_embedding_type` is "vllm", it requires
-        `model_embedding_url` to be provided.
-    If `model_embedding` and `model_embedding_url` are not provided,
-        it raises a ValueError.
-    If `qdrant_url` is not provided, it raises a ValueError.
-    If `model_embedding_vs_name` and `model_embedding_vs_type`
-        are not provided, it raises a ValueError.
-    If `model_embedding_vs_type` is "local", it requires
-        `model_embedding_vs_path` to be provided.
-    Args:
-        kwargs (dict): A dictionary containing optional parameters
-            for memory persistence configuration.
-        The expected structure for `memory_persistence_config` is:
-            {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0
-            }
-        - `model_embedding_type`: The type of model embedding
-            to use (default is settings.LLM_MODEL_TYPE).
-        - `model_embedding`: The name of the model embedding
-            to use (default is settings.MODEL_EMBEDDING).
-        - `model_embedding_url`: The URL of the model embedding
-            (default is settings.LLM_EMBEDDING_URL).
-        - `qdrant_url`: The URL of the Qdrant instance
-            (default is the environment variable QDRANT_URL).
-        - `model_embedding_vs_name`: The name of the vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_MODEL).
-        - `model_embedding_vs_type`: The type of vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_TYPE).
-        - `model_embedding_vs_path`: The path to the vector store
-            for the model embedding
-                (default is settings.VECTORDB_SENTENCE_PATH).
-
-    Yields:
-        Any: Chunks of the agent's response as they are generated.
-
-    Example:
-        async for chunk in agent_stream("Hello, agent!"):
-            print(chunk)
+        prompt (str): The user input prompt to be processed by the agent.
+        tools (list): A list of tools available for the agent to use.
+        thread_id (str): A unique identifier for the thread,
+            used for tracking and logging.
     """
     try:
 
@@ -345,7 +236,7 @@ async def stream(
 
             agent = create_react_agent(
                 kgrag._get_model(),
-                tools=await _get_tools(),
+                tools=tools,
                 store=memory_store.get_in_memory_store(),
                 checkpointer=checkpointer,
                 state_schema=State,
