@@ -27,18 +27,18 @@ async def arxiv_query(
     Args:
         query (str): Search query for Arxiv.
     """
-    papers: list[Any] = []
-    async for paper in _export_arxiv_papers(search_query, max_results):
-        papers.append(paper)
+    #papers: list[Any] = []
+    #async for paper in _export_arxiv_papers(search_query, max_results):
+    #    papers.append(paper)
 
     response = await kgrag.query(search_query)
     return {
         "jsonrpc": "2.0",
         "result": {
             "message": str(response),
-            "papers": (
-                papers[-1] if len(papers) > 0 else ["No papers found."]
-            )
+            #"papers": (
+            #    papers[-1] if len(papers) > 0 else ["No papers found."]
+            #)
         },
         "id": thread_id
     }
