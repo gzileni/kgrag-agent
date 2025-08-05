@@ -1,4 +1,5 @@
-from kgrag_store import settings, KGragRetriever
+from kgrag_store import KGragRetriever
+from config import settings
 
 
 model_embedding_url: str | None = None

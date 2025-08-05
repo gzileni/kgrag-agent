@@ -2,11 +2,12 @@ from agent import stream
 from fastapi import FastAPI, Request, HTTPException
 from sse_starlette.sse import EventSourceResponse
 from langmem import create_manage_memory_tool, create_search_memory_tool
-from mcp_client import kgrag_mcp_client
+from mcp_client import mcp_client
+from config import settings
 
 app = FastAPI(title="KGraph Agent",
               description="An agent for querying using KGraph",
-              version="0.1.0")
+              version=settings.APP_VERSION)
 
 
 @app.post("/agent")
@@ -14,7 +15,7 @@ async def query_kgrag(request: Request):
     try:
         data = await request.json()
         user_input = data.get("query")
-        tools = await kgrag_mcp_client.get_tools()
+        tools = await mcp_client.get_tools()
         tools.extend([
             create_manage_memory_tool(namespace=("memories",)),
             create_search_memory_tool(namespace=("memories",))

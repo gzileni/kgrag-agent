@@ -1,10 +1,11 @@
+from config import settings
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-kgrag_mcp_client = MultiServerMCPClient(
+mcp_client = MultiServerMCPClient(
     {
         "kgrag": {
             # Ensure you start your kgrag server on port 8001
-            "url": "http://localhost:8001/sse",
+            "url": settings.MCP_SERVER_URL,
             "transport": "sse",
         }
     }
