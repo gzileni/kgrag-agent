@@ -7,3 +7,7 @@
 ## MCP Server
 
 ## Ingestion Data
+
+## Relations and Nodes
+
+## Query

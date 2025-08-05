@@ -1,5 +1,4 @@
-from .kgrag_config import settings
-from .kgrag_retrievers import MemoryStoreRetriever
+from kgrag_store import settings, KGragRetriever
 
 
 model_embedding_url: str | None = None
@@ -8,7 +7,7 @@ if settings.LLM_MODEL_TYPE == "ollama" and settings.LLM_URL is not None:
     model_embedding_url = f"{settings.LLM_URL}/api/embeddings"
     llm_model_url = settings.LLM_URL
 
-kgrag = MemoryStoreRetriever(
+kgrag = KGragRetriever(
     path_type="fs",
     path_download=settings.PATH_DOWNLOAD,
     format_file="pdf",

@@ -7,7 +7,8 @@ from langchain_core.messages.utils import count_tokens_approximately
 from memory_agent import MemoryCheckpointer, MemoryPersistence
 from langgraph.config import get_store
 from log import logger, get_metadata
-from krag import settings, kgrag, State
+from kgrag_store import settings, State
+from kgrag import kgrag
 
 summarize_node = SummarizationNode(
     token_counter=count_tokens_approximately,

@@ -1,12 +1,12 @@
 import uuid
 from mcp.server.fastmcp import FastMCP
-from krag import (
+from kgrag_store import (
     PARSER_PROMPT,
-    AGENT_PROMPT,
-    kgrag
+    AGENT_PROMPT
 )
 from starlette.applications import Starlette
 from starlette.routing import Mount
+from kgrag import kgrag
 
 # Initialize FastMCP server
 mcp = FastMCP("KGraph")
