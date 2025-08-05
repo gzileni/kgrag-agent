@@ -1,4 +1,4 @@
-.PHONY: run-qdrant
+.PHONY: run stop restart
 
 run:
 	echo "Running stack agent ..."
