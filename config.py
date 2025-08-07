@@ -64,7 +64,7 @@ def get_environment() -> Environment:
         Environment: The current environment
         (development, staging, production, or test)
     """
-    match os.getenv("APP_ENV", "development").lower():
+    match os.getenv("APP_ENV", "production").lower():
         case "production" | "prod":
             return Environment.PRODUCTION
         case "staging" | "stage":
@@ -81,14 +81,13 @@ def load_env_file():
     env = get_environment()
     print(f"Loading environment: {env}")
     path_env = os.path.dirname(os.path.abspath(__file__))
-    p_env: str = os.path.join(path_env, "..")
 
     # Define env files in priority order
     env_files = [
-        os.path.join(p_env, f".env.{env.value}.local"),
-        os.path.join(p_env, f".env.{env.value}"),
-        os.path.join(p_env, ".env.local"),
-        os.path.join(p_env, ".env"),
+        os.path.join(path_env, f".env.{env.value}.local"),
+        os.path.join(path_env, f".env.{env.value}"),
+        os.path.join(path_env, ".env.local"),
+        os.path.join(path_env, ".env"),
     ]
 
     # Load the first env file that exists
@@ -110,8 +109,7 @@ def load_env_llm(model: str):
 
     # leggi la cartella corrente del file
     path_env = os.path.dirname(os.path.abspath(__file__))
-    p_env: str = os.path.join(path_env, "..")
-    env_llm = os.path.join(p_env, env_file_llm)
+    env_llm = os.path.join(path_env, env_file_llm)
     if os.path.exists(env_llm):
         load_dotenv(dotenv_path=env_llm)
         print(f"Loaded LLM environment from {env_llm}")
@@ -191,28 +189,15 @@ class Settings:
         """
         # Set the environment
         self.ENVIRONMENT = get_environment()
-        self.APP_VERSION = os.getenv("APP_VERSION", "0.1.0")
-        self.USER_AGENT = os.getenv("USER_AGENT", "AI Agent for Arxiv")
-
-        self.AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-        self.AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-        self.AWS_BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
-        self.AWS_REGION = os.getenv('AWS_REGION')
+        self.APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+        self.USER_AGENT = os.getenv("USER_AGENT", "KGrag Agent")
 
         self.COLLECTION_NAME = os.getenv('COLLECTION_NAME', 'kgrag_data')
 
         self.PATH_DOWNLOAD = get_path_ingestion(
             f"{self.COLLECTION_NAME}"
         )
-
-        # Neo4j settings
-        self.NEO4J_URL = os.getenv('NEO4J_URL', 'neo4j://localhost:47687')
-        self.NEO4J_USERNAME = os.getenv('NEO4J_USERNAME', 'neo4j')
-        self.NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'n304j2025')
-        self.NEO4J_DB_NAME = os.getenv('NEO4J_DB_NAME', None)
-        logger.info(f"Neo4j URL: {self.NEO4J_URL}")
-        logger.info(f"Neo4j Username: {self.NEO4J_USERNAME}")
-        logger.info(f"Neo4j DB Name: {self.NEO4J_DB_NAME}")
+        logger.info(f"Path Download: {self.PATH_DOWNLOAD}")
 
         # Redis settings
         self.REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
