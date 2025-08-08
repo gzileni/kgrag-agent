@@ -14,7 +14,7 @@ app = FastAPI(title="KGraph Agent",
 async def query_kgrag(request: Request):
     try:
         data = await request.json()
-        user_input = data.get("query")
+        user_input = data.get("user_input")
         tools = await mcp_client.get_tools()
         tools.extend([
             create_manage_memory_tool(namespace=("memories",)),

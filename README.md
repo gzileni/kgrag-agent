@@ -8,4 +8,22 @@
 
 ## [Development](DEV.md)
 
+```bash
+curl --location --request GET '' \
+--header 'Content-Type: application/json' \
+--data '{
+    "user_input": "Cos'\''è il Machine Learning?"
+}'
+```
+
+### Ingestion 
+
+```bash
+curl --location 'http://localhost:8001/agent' \
+--header 'Content-Type: application/json' \
+--data '{
+    "user_input": "/Users/giuseppezileni/arxiv/2508.03696v1.pdf"
+}'
+```
+
 

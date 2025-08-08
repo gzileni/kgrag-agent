@@ -257,11 +257,9 @@ async def stream(
                     extra=get_metadata(thread_id=thread_id)
                 )
                 event_item = None
-                is_agent: bool = False
 
                 if "agent" in event:
                     event_item = event["agent"]
-                    is_agent = True
                     logger.debug(
                         f">>> Agent event detected {event_item}",
                         extra=get_metadata(thread_id=thread_id)
@@ -289,12 +287,11 @@ async def stream(
                         )
                         if (
                             event_response
-                            or (len(event_response) > 0 and is_agent)
+                            or (len(event_response) > 0)
                         ):
                             yield event_response
 
                 index += 1
-                is_agent = False
 
     except Exception as e:
         # In caso di errore, restituisce un messaggio di errore
