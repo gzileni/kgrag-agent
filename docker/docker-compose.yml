@@ -4,7 +4,7 @@ services:
   memory-redis:
     container_name: memory-redis
     restart: always
-    image: redis:7
+    image: redis:8.2.0
     ports:
       - "6379:6379"
     volumes:
