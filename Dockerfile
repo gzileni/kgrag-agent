@@ -9,11 +9,13 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt || true
 
+RUN pip install --no-cache-dir uv
+
 COPY *.py .
 
-EXPOSE 8000
+EXPOSE 8010
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uv", "run", "app", "--host", "0.0.0.0", "--port", "8010"]
 # ENTRYPOINT ["sh", "-c", "uvicorn main:app --host=$UVICORN_HOST --port=$UVICORN_PORT --log-level=$UVICORN_LOG_LEVEL --workers=$UVICORN_WORKERS"]
