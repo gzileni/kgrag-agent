@@ -2,7 +2,6 @@
 
 run:
 	echo "Running stack agent ..."
-	docker-compose -p kgrag-agent pull
 	docker-compose -p kgrag-agent up -d
 
 stop:

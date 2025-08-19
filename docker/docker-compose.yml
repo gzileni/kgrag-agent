@@ -3,6 +3,7 @@ services:
   kgrag-mcp-server:
     container_name: kgrag_mcp_server
     restart: always
+    pull_policy: always
     image: ghcr.io/gzileni/kgrag_mcp_server:main
     ports:
       - "8000:8000"
@@ -36,6 +37,7 @@ services:
 
   kgrag-agent:
     container_name: kgrag_agent
+    pull_policy: always
     restart: always
     image: ghcr.io/gzileni/kgrag-agent:main
     ports:
