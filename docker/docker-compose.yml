@@ -39,7 +39,7 @@ services:
   kgrag-agent:
     container_name: kgrag_agent
     restart: always
-    image: ghcr.io/gzileni/kgrag_agent:main
+    image: ghcr.io/gzileni/kgrag-agent:main
     ports:
       - "8010:8010"  
     expose:
