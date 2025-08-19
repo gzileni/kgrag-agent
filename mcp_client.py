@@ -5,7 +5,7 @@ mcp_client = MultiServerMCPClient(
     {
         "kgrag": {
             # Ensure you start your kgrag server on port 8001
-            "url": settings.MCP_SERVER_URL,
+            "url": settings.MCP_SERVER_KGRAG,
             "transport": "sse",
         }
     }

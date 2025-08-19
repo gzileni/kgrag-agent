@@ -1,60 +1,89 @@
-
 services:
 
-  memory-redis:
-    container_name: memory-redis
+  kgrag-mcp-server:
+    container_name: kgrag_mcp_server
     restart: always
-    image: redis:8.2.0
+    image: ghcr.io/gzileni/kgrag_mcp_server:main
     ports:
-      - "6379:6379"
-    volumes:
-      - memory-redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
+      - "8000:8000"
+      - "6379:6379"   # Redis
+      - "6333:6333"   # QDrant
+      - "6334:6334"   # QDrant
+      - "7474:7474"   # HTTP - Neo4j
+      - "7687:7687"   # Bolt - Neo4J
     networks:
-      - memory-network
-
-  memory-qdrant:
-    container_name: memory-qdrant
-    platform: linux/amd64
-    image: qdrant/qdrant:v1.15.0
-    restart: always
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    expose:
-      - 6333
-      - 6334
-      - 6335
+      - kgrag-network
+    environment:
+      - APP_ENV=${APP_ENV}
+      - LLM_MODEL_TYPE=${LLM_MODEL_TYPE}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+      - COLLECTION_NAME=${COLLECTION_NAME}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
+      - MODEL_EMBEDDING=${MODEL_EMBEDDING}
+      - LLM_URL=${LLM_URL}
+      - LOKI_URL=http://kgrag-loki:3100/loki/api/v1/push
+      - NEO4J_USERNAME=${NEO4J_USERNAME}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - NEO4J_AUTH=${NEO4J_AUTH}
     volumes:
-      - memory-qdrant-data:/qdrant/storage:z
+      - qdrant_data:/qdrant/storage:z
       - ./qdrant/config.yml:/qdrant/config.yml:ro
-    networks:
-      - memory-network
+      - redis_data:/data
+      - neo4j_data:/var/lib/neo4j/data
+      - ./neo4j.conf:/etc/neo4j/neo4j.conf:ro
 
-  memory-loki:
-    container_name: memory-loki
+  kgrag-agent:
+    container_name: kgrag_agent
+    restart: always
+    image: ghcr.io/gzileni/kgrag_agent:main
+    ports:
+      - "8010:8010"  
+    expose:
+      - 8010
+    environment:
+      - MCP_SERVER_KGRAG="http://kgrag_mcp_server:8000/sse"
+      - APP_ENV=${APP_ENV}
+      - LLM_MODEL_TYPE=${LLM_MODEL_TYPE}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
+      - MODEL_EMBEDDING=${MODEL_EMBEDDING}
+      - LLM_URL=${LLM_URL}
+      - LOKI_URL=http://kgrag-loki:3100/loki/api/v1/push
+      - NEO4J_URL=neo4j://kgrag-mcp-server:7687
+      - NEO4J_USERNAME=${NEO4J_USERNAME}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - NEO4J_AUTH=${NEO4J_AUTH}
+      - REDIS_URL=redis://kgrag_mcp_server:6379
+      - REDIS_HOST=kgrag_mcp_server
+      - REDIS_PORT=6379
+      - REDIS_DB=10
+      - QDRANT_URL="http://kgrag_mcp_server:6333"
+    networks:
+      - kgrag-network
+
+  kgrag-loki:
+    container_name: kgrag-loki
     image: grafana/loki:latest
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
-      - memory-network
+      - kgrag-network
 
-  memory-promtail:
-    container_name: memory-promtail
+  kgrag-promtail:
+    container_name: kgrag-promtail
     image: grafana/promtail:latest
     volumes:
-      - memory-loki-log:/var/log
+      - loki-log:/var/log
     command: -config.file=/etc/promtail/config.yml
     networks:
-      - memory-network
+      - kgrag-network
 
-  memory-grafana:
-    container_name: memory-grafana
+  kgrag-grafana:
+    container_name: kgrag-grafana
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
       - GF_AUTH_ANONYMOUS_ENABLED=true
@@ -72,7 +101,7 @@ services:
           type: loki
           access: proxy 
           orgId: 1
-          url: http://loki:3100
+          url: http://kgrag-loki:3100
           basicAuth: false
           isDefault: true
           version: 1
@@ -81,40 +110,15 @@ services:
         /run.sh
     image: grafana/grafana:latest
     volumes:
-      - memory-grafana-data:/var/lib/grafana  # Volume persistente per i dati di Grafana
+      - grafana-data:/var/lib/grafana  # Volume persistente per i dati di Grafana
     ports:
       - "3000:3000"
     networks:
-      - memory-network
-
-  memory-neo4j:
-    container_name: memory-neo4j
-    image: neo4j:2025.04.0
-    restart: always
-    ports:
-      - "7474:7474"   # HTTP
-      - "7687:7687"   # Bolt
-    environment:
-      NEO4J_AUTH: $NEO4J_AUTH
-      NEO4J_PLUGINS: '["apoc"]' 
-      NEO4J_apoc_export_file_enabled: true
-      NEO4J_apoc_import_file_enabled: true
-      NEO4J_apoc_import_file_use__neo4j__config: true
-    volumes:
-      - memory-neoj-data:/data
-    networks:
-      - memory-network
-
-volumes:
-  memory-qdrant-data:
-  memory-redis-data:
-  memory-loki-log:
-  memory-grafana-data:
-  memory-neoj-data:
+      - kgrag-network
 
 networks:
-  memory-network:
-    name: memory-network
+  kgrag-network:
+    name: kgrag-network
     driver: bridge
     ipam:
       driver: default

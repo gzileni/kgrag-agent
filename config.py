@@ -242,8 +242,8 @@ class Settings:
         )
         self.VECTORDB_SENTENCE_PATH = os.getenv("VECTORDB_SENTENCE_PATH", None)
 
-        self.MCP_SERVER_URL = os.getenv(
-            "MCP_SERVER_URL",
+        self.MCP_SERVER_KGRAG = os.getenv(
+            "MCP_SERVER_KGRAG",
             "http://localhost:8000/sse"
         )
 
