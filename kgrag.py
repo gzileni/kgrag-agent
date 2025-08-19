@@ -21,5 +21,9 @@ kgrag = KGragGraph(
     qdrant_url=settings.QDRANT_URL,
     redis_host=settings.REDIS_HOST,
     redis_port=settings.REDIS_PORT,
-    redis_db=settings.REDIS_DB
+    redis_db=settings.REDIS_DB,
+    neo4j_url=settings.NEO4J_URL,
+    neo4j_username=settings.NEO4J_USERNAME,
+    neo4j_password=settings.NEO4J_PASSWORD,
+    neo4j_db_name=settings.NEO4J_DB_NAME,
 )

@@ -17,5 +17,5 @@ EXPOSE 8010
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["uv", "run", "app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["uv", "run", ".", "--host", "0.0.0.0", "--port", "8010"]
 # ENTRYPOINT ["sh", "-c", "uvicorn main:app --host=$UVICORN_HOST --port=$UVICORN_PORT --log-level=$UVICORN_LOG_LEVEL --workers=$UVICORN_WORKERS"]

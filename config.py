@@ -199,6 +199,16 @@ class Settings:
         )
         logger.info(f"Path Download: {self.PATH_DOWNLOAD}")
 
+        # Neo4j settings
+        self.NEO4J_URL = os.getenv('NEO4J_URL', 'neo4j://localhost:7687')
+        self.NEO4J_USERNAME = os.getenv('NEO4J_USERNAME', 'neo4j')
+        self.NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
+        self.NEO4J_DB_NAME = os.getenv('NEO4J_DB_NAME', None)
+        logger.info(f"Neo4j URL: {self.NEO4J_URL}")
+        logger.info(f"Neo4j Username: {self.NEO4J_USERNAME}")
+        if self.NEO4J_DB_NAME:
+            logger.info(f"Neo4j DB Name: {self.NEO4J_DB_NAME}")
+
         # Redis settings
         self.REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
         self.REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
