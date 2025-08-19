@@ -191,7 +191,7 @@ class Settings:
         self.ENVIRONMENT = get_environment()
         self.APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
         self.USER_AGENT = os.getenv("USER_AGENT", "KGrag Agent")
-
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", None)
         self.COLLECTION_NAME = os.getenv('COLLECTION_NAME', 'kgrag_data')
 
         self.PATH_DOWNLOAD = get_path_ingestion(

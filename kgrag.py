@@ -26,4 +26,5 @@ kgrag = KGragGraph(
     neo4j_username=settings.NEO4J_USERNAME,
     neo4j_password=settings.NEO4J_PASSWORD,
     neo4j_db_name=settings.NEO4J_DB_NAME,
+    api_key=settings.OPENAI_API_KEY
 )
