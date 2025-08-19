@@ -46,6 +46,7 @@ services:
       - MCP_SERVER_KGRAG="http://kgrag_mcp_server:8000/sse"
       - USER_AGENT=${USER_AGENT}
       - APP_ENV=${APP_ENV}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LLM_MODEL_TYPE=${LLM_MODEL_TYPE}
       - LLM_MODEL_NAME=${LLM_MODEL_NAME}
       - MODEL_EMBEDDING=${MODEL_EMBEDDING}
