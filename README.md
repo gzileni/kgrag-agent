@@ -10,14 +10,8 @@
 
 ## [Development](DEV.md)
 
-```bash
-curl --location --request GET '' \
---header 'Content-Type: application/json' \
---data '{
-    "user_input": "Cos'\''è il Machine Learning?"
-}'
-```
-
 ## A2A
+
+## [Docker](./docker/README.md)
 
 
