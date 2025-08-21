@@ -89,6 +89,9 @@ class KGragAgentExecutor(AgentExecutor):
         self,
         context: RequestContext
     ) -> bool:
+        """
+        Validates the request context.
+        """
         return False
 
     async def cancel(
@@ -96,4 +99,7 @@ class KGragAgentExecutor(AgentExecutor):
         context: RequestContext,
         event_queue: EventQueue
     ) -> None:
+        """
+        Cancels the current task.
+        """
         raise ServerError(error=UnsupportedOperationError())

@@ -12,14 +12,8 @@ from a2a.server.tasks import (
     InMemoryPushNotificationConfigStore,
     InMemoryTaskStore,
 )
-from a2a.types import (
-    AgentCapabilities,
-    AgentCard,
-    AgentSkill,
-)
 from dotenv import load_dotenv
-
-from agent import KGragAgent
+from agent_configurator import create_agent_card
 from agent_executor import KGragAgentExecutor
 
 
@@ -37,35 +31,10 @@ class MissingAPIKeyError(Exception):
 @click.option('--host', 'host', default='localhost')
 @click.option('--port', 'port', default=10000)
 def main(host, port):
-    """Starts the Currency Agent server."""
+    """
+    Main entry point for the application.
+    """
     try:
-        capabilities = AgentCapabilities(
-            streaming=True,
-            push_notifications=True
-        )
-
-        skill = AgentSkill(
-            id='convert_currency',
-            name='Currency Exchange Rates Tool',
-            description=(
-                'Helps with exchange values between various currencies'
-            ),
-            tags=['currency conversion', 'currency exchange'],
-            examples=['What is exchange rate between USD and GBP?'],
-        )
-
-        agent_card = AgentCard(
-            name='Currency Agent',
-            description='Helps with exchange rates for currencies',
-            url=f'http://{host}:{port}/',
-            version='1.0.0',
-            default_input_modes=KGragAgent.SUPPORTED_CONTENT_TYPES,
-            default_output_modes=KGragAgent.SUPPORTED_CONTENT_TYPES,
-            capabilities=capabilities,
-            skills=[skill],
-        )
-
-        # --8<-- [start:DefaultRequestHandler]
         httpx_client = httpx.AsyncClient()
         push_config_store = InMemoryPushNotificationConfigStore()
         push_sender = BasePushNotificationSender(
@@ -79,12 +48,17 @@ def main(host, port):
             push_config_store=push_config_store,
             push_sender=push_sender
         )
+
         server = A2AStarletteApplication(
-            agent_card=agent_card, http_handler=request_handler
+            agent_card=create_agent_card(host, port),
+            http_handler=request_handler
         )
 
-        uvicorn.run(server.build(), host=host, port=port)
-        # --8<-- [end:DefaultRequestHandler]
+        uvicorn.run(
+            server.build(),
+            host=host,
+            port=port
+        )
 
     except MissingAPIKeyError as e:
         logger.error(f'Error: {e}')
