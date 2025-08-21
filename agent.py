@@ -1,4 +1,3 @@
-import json
 import uuid
 from typing import Literal, AsyncIterable, Any
 from langgraph.prebuilt import create_react_agent
@@ -206,41 +205,27 @@ class KGragAgent:
         input_data = {"messages": [{"role": "user", "content": prompt}]}
         return config, input_data
 
-    def get_agent_response(self, agent, config):
+    def get_agent_response(
+        self,
+        content: str,
+        thread_id
+    ):
         """
         Get the agent's response based on the current state.
         """
-        current_state = agent.get_state(config)
-        structured_response = current_state.values.get('structured_response')
-        if structured_response and isinstance(
-            structured_response, ResponseFormat
-        ):
-            if structured_response.status == 'input_required':
-                return {
-                    'is_task_complete': False,
-                    'require_user_input': True,
-                    'content': structured_response.message,
-                }
-            if structured_response.status == 'error':
-                return {
-                    'is_task_complete': False,
-                    'require_user_input': True,
-                    'content': structured_response.message,
-                }
-            if structured_response.status == 'completed':
-                return {
-                    'is_task_complete': True,
-                    'require_user_input': False,
-                    'content': structured_response.message,
-                }
-
-        return {
+        result: dict = {
             'is_task_complete': False,
             'require_user_input': True,
             'content': (
                 'We are unable to process your request at the moment. '
                 'Please try again.'
-            ),
+            )
+        }
+
+        return {
+            "jsonrpc": "2.0",
+            "id": thread_id,
+            "result": result
         }
 
     async def invoke(
@@ -316,6 +301,26 @@ class KGragAgent:
             thread_id (str): A unique identifier for the thread,
                 used for tracking and logging.
         """
+
+        result: dict = {
+            'is_task_complete': False,
+            'require_user_input': True,
+            'content': (
+                'We are unable to process your request at the moment. '
+                'Please try again.'
+            )
+        }
+
+        response_json: dict = {
+            "jsonrpc": "2.0",
+            "id": self.thread_id,
+            "result": result,
+            "error": {
+                "code": 500,
+                "message": "Internal Server Error"
+            }
+        }
+
         try:
 
             config, input_data = self._get_agent_params(
@@ -368,12 +373,13 @@ class KGragAgent:
                             agent_process,
                             extra=get_metadata(thread_id=self.thread_id)
                         )
-
-                        yield {
+                        response_json["error"] = {}
+                        response_json["result"] = {
                             'is_task_complete': False,
                             'require_user_input': False,
                             'content': agent_process,
                         }
+                        yield response_json
 
                     elif "tools" in event:
                         event_item = event["tools"]
@@ -384,12 +390,13 @@ class KGragAgent:
                             tool_process,
                             extra=get_metadata(thread_id=self.thread_id)
                         )
-
-                        yield {
+                        response_json["error"] = {}
+                        response_json["result"] = {
                             'is_task_complete': False,
                             'require_user_input': False,
                             'content': tool_process,
                         }
+                        yield response_json
 
                     if event_item is not None:
                         if (
@@ -411,17 +418,25 @@ class KGragAgent:
                                 event_response
                                 or (len(event_response) > 0)
                             ):
-                                yield self.get_agent_response(agent, config)
-
+                                response_json["error"] = {}
+                                response_json["result"] = {
+                                    'is_task_complete': True,
+                                    'require_user_input': False,
+                                    'content': event_response,
+                                }
+                                yield response_json
                     index += 1
 
         except Exception as e:
             # In caso di errore, restituisce un messaggio di errore
-            error_message = json.dumps({"error": str(e)})
-            msg: str = f"response: {error_message}\n\n"
-            yield {
+            response_json["result"] = {
                 'is_task_complete': False,
                 'require_user_input': False,
-                'content': msg,
+                'content': '',
             }
+            response_json["error"] = {
+                "code": 500,
+                "message": str(e)
+            }
+            yield response_json
             raise e
